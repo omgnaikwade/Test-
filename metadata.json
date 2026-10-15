@@ -1,0 +1,6 @@
+{
+  "name": "Quest CBT",
+  "description": "JEE Main mock test CBT app with NTA interface, LaTeX rendering, offline support and score analysis",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
