@@ -35,4 +35,7 @@ interface AttemptDao {
 
     @Query("DELETE FROM attempts WHERE testId = :testId")
     suspend fun deleteAttemptsForTest(testId: String)
+
+    @Query("DELETE FROM attempts")
+    suspend fun deleteAll()
 }

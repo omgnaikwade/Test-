@@ -27,4 +27,8 @@ class AttemptRepository(private val attemptDao: AttemptDao) {
     suspend fun deleteAttemptsForTest(testId: String) {
         attemptDao.deleteAttemptsForTest(testId)
     }
+
+    suspend fun deleteAll() {
+        attemptDao.deleteAll()
+    }
 }

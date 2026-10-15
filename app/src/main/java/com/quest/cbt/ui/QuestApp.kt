@@ -129,6 +129,7 @@ fun QuestApp() {
                     SettingsScreen(
                         cloudSyncRepository = cloudSyncRepository,
                         testRepository = testRepository,
+                        attemptRepository = attemptRepository,
                         onBack = { navController.popBackStack() }
                     )
                 }

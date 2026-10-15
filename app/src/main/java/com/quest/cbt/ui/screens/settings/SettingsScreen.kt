@@ -1,5 +1,6 @@
 package com.quest.cbt.ui.screens.settings
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,13 +22,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -39,10 +43,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +60,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quest.cbt.data.repository.AttemptRepository
 import com.quest.cbt.data.repository.CloudSyncRepository
 import com.quest.cbt.data.repository.SyncState
 import com.quest.cbt.data.repository.TestRepository
@@ -70,6 +79,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     cloudSyncRepository: CloudSyncRepository,
     testRepository: TestRepository,
+    attemptRepository: AttemptRepository,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -77,9 +87,19 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
+    val prefs = remember {
+        context.getSharedPreferences("quest_app_settings", Context.MODE_PRIVATE)
+    }
+
+    var timerWarningEnabled by remember {
+        mutableStateOf(prefs.getBoolean("timer_warning_15min", true))
+    }
+    var showClearDataDialog by remember { mutableStateOf(false) }
+
     val isDriveSyncEnabled by cloudSyncRepository.isDriveSyncEnabled.collectAsState(initial = false)
     val syncState by cloudSyncRepository.syncState.collectAsState(initial = SyncState.Idle)
     val tests by testRepository.allTests.collectAsState(initial = emptyList())
+    val completedAttempts by attemptRepository.allCompletedAttempts.collectAsState(initial = emptyList())
 
     Column(
         modifier = modifier
@@ -116,6 +136,88 @@ fun SettingsScreen(
                 .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
+            // Timer Warning Setting
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, CardBorder, RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(PeriwinkleAccent.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = null,
+                                    tint = PeriwinkleAccent,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Timer Warning Alert",
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Alert at 15 minutes left",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = timerWarningEnabled,
+                            onCheckedChange = { checked ->
+                                timerWarningEnabled = checked
+                                prefs.edit().putBoolean("timer_warning_15min", checked).apply()
+                                Toast.makeText(
+                                    context,
+                                    if (checked) "15-minute exam alert enabled" else "Exam alert disabled",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = OnPeriwinkle,
+                                checkedTrackColor = PeriwinkleAccent,
+                                uncheckedThumbColor = TextMuted,
+                                uncheckedTrackColor = CardSurfaceElevated
+                            ),
+                            modifier = Modifier.testTag("timer_warning_switch")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "When active, the CBT header timer turns amber and alerts you when exactly 15 minutes remain in the examination.",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Google Drive Cloud Sync Card
             Card(
                 modifier = Modifier
@@ -131,7 +233,10 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
@@ -185,7 +290,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "When enabled, tests and attempts are saved securely in your private Google Drive 'appDataFolder'. Test media can be downloaded on demand and local copies purged to free device storage.",
+                        text = "When enabled, tests and attempts are saved securely in your private Google Drive 'appDataFolder'. Test media can be downloaded on demand and restored across devices.",
                         color = TextSecondary,
                         fontSize = 12.sp,
                         lineHeight = 17.sp
@@ -270,7 +375,7 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Storage & Local Data Card
             Card(
@@ -295,22 +400,42 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(text = "Local Storage", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "${tests.size} tests stored on device", color = TextSecondary, fontSize = 11.sp)
+                            Text(text = "${tests.size} tests • ${completedAttempts.size} attempts saved", color = TextSecondary, fontSize = 11.sp)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "Quest CBT operates 100% offline using an on-device Room database. LaTeX formulas are rendered locally via KaTeX.",
+                        text = "Quest CBT operates 100% offline using Room SQLite database. LaTeX formulas are rendered locally via KaTeX without external network requests.",
                         color = TextSecondary,
                         fontSize = 12.sp,
                         lineHeight = 17.sp
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = { showClearDataDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
+                            .testTag("clear_all_data_btn"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF3B181E),
+                            contentColor = Color(0xFFEF4444)
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFFEF4444))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Clear All Data", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // About Card
             Card(
@@ -331,18 +456,57 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Quest CBT v1.0\n" +
-                                "Standard: JEE Main (Physics, Chemistry, Maths)\n" +
-                                "Marking Pattern: +4 Correct, -1 Incorrect, 0 Unattempted\n" +
-                                "Engine: Jetpack Compose, Room, KaTeX Offline",
+                        text = "• App Version: 1.0\n" +
+                                "• Supported JSON Schema: Version 1\n" +
+                                "• Standard Pattern: JEE Main (Physics, Chemistry, Maths)\n" +
+                                "• Marking Pattern: +4 Correct, -1 Negative, 0 Unattempted\n" +
+                                "• Architecture: MVVM, Room SQLite, KaTeX Offline",
                         color = TextSecondary,
                         fontSize = 12.sp,
-                        lineHeight = 18.sp
+                        lineHeight = 19.sp
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(30.dp))
         }
+    }
+
+    // Clear Data Confirmation Dialog
+    if (showClearDataDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDataDialog = false },
+            title = {
+                Text("Clear All Data?", color = TextPrimary, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "This will permanently delete all mock tests, images, and student attempt histories from the local database. This cannot be undone.",
+                    color = TextSecondary,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            testRepository.deleteAll()
+                            attemptRepository.deleteAll()
+                            showClearDataDialog = false
+                            Toast.makeText(context, "All tests and attempts cleared.", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                ) {
+                    Text("Clear All", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            },
+            containerColor = CardSurface
+        )
     }
 }

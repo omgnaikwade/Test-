@@ -128,6 +128,7 @@ class ResultSummaryViewModelTest {
                 override suspend fun insertAttempt(attempt: AttemptEntity) {}
                 override suspend fun deleteAttempt(attemptId: String) {}
                 override suspend fun deleteAttemptsForTest(testId: String) {}
+                override suspend fun deleteAll() {}
             }
         )
 
